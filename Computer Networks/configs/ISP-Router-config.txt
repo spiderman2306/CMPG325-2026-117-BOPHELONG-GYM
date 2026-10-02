@@ -1,0 +1,24 @@
+!===============================================================
+! ISP-Router - Cisco 2911 - simulates the Internet / ISP edge
+! Project CMPG325-2026-117 | Client CLI-117 | Milestone 2
+! Deliberately has NO route to 10.45.0.0/16 - Router0 uses NAT (PAT),
+! so return traffic always comes back to 10.45.1.1.
+!===============================================================
+enable
+configure terminal
+!
+hostname ISP-Router
+no ip domain-lookup
+!
+interface GigabitEthernet0/0
+ description Link to Router0 Gi0/0 (client WAN)
+ ip address 10.45.1.2 255.255.255.252
+ no shutdown
+!
+interface GigabitEthernet0/1
+ description Simulated Internet LAN (Internet-Server)
+ ip address 198.51.100.1 255.255.255.0
+ no shutdown
+!
+end
+write memory

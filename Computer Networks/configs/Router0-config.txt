@@ -1,0 +1,132 @@
+!===============================================================
+! Router0 - Cisco 2911 - Bophelong Gym & Fitness Centre (Vryburg)
+! Project CMPG325-2026-117 | Client CLI-117 | Milestone 2
+! LAB CREDENTIALS ONLY - change before any real-world use
+!===============================================================
+enable
+configure terminal
+!
+hostname Router0
+no ip domain-lookup
+service password-encryption
+enable secret Enable#Gym2026
+!
+banner motd #
+AUTHORISED ACCESS ONLY - Bophelong Gym and Fitness Centre.
+Activity on this device is monitored.
+#
+!
+! ---------- WAN ----------
+interface GigabitEthernet0/0
+ description WAN to ISP-Router
+ ip address 10.45.1.1 255.255.255.252
+ ip nat outside
+ no shutdown
+!
+! ---------- Router-on-a-stick trunk ----------
+interface GigabitEthernet0/1
+ description 802.1Q trunk to Switch0 Gi0/1
+ no ip address
+ no shutdown
+!
+interface GigabitEthernet0/1.10
+ description VLAN 10 MGMT
+ encapsulation dot1Q 10
+ ip address 10.45.10.1 255.255.255.0
+ ip nat inside
+!
+interface GigabitEthernet0/1.20
+ description VLAN 20 STAFF
+ encapsulation dot1Q 20
+ ip address 10.45.20.1 255.255.255.0
+ ip nat inside
+!
+interface GigabitEthernet0/1.30
+ description VLAN 30 GYM FLOOR
+ encapsulation dot1Q 30
+ ip address 10.45.30.1 255.255.255.0
+ ip nat inside
+!
+interface GigabitEthernet0/1.40
+ description VLAN 40 GUEST WI-FI (CR3)
+ encapsulation dot1Q 40
+ ip address 10.45.40.1 255.255.255.0
+ ip access-group GUEST-IN in
+ ip nat inside
+!
+interface GigabitEthernet0/1.99
+ description Native VLAN 99 (no hosts, no IP)
+ encapsulation dot1Q 99 native
+!
+interface GigabitEthernet0/2
+ description Unused
+ shutdown
+!
+! ---------- DHCP (end-user VLANs only) ----------
+ip dhcp excluded-address 10.45.20.1 10.45.20.99
+ip dhcp excluded-address 10.45.20.201 10.45.20.254
+ip dhcp excluded-address 10.45.30.1 10.45.30.99
+ip dhcp excluded-address 10.45.30.201 10.45.30.254
+ip dhcp excluded-address 10.45.40.1 10.45.40.99
+ip dhcp excluded-address 10.45.40.201 10.45.40.254
+!
+ip dhcp pool STAFF-POOL
+ network 10.45.20.0 255.255.255.0
+ default-router 10.45.20.1
+ dns-server 198.51.100.10
+!
+ip dhcp pool GYMFLOOR-POOL
+ network 10.45.30.0 255.255.255.0
+ default-router 10.45.30.1
+ dns-server 198.51.100.10
+!
+ip dhcp pool GUEST-POOL
+ network 10.45.40.0 255.255.255.0
+ default-router 10.45.40.1
+ dns-server 198.51.100.10
+!
+! ---------- NAT (PAT) and default route ----------
+ip access-list standard NAT-INSIDE
+ permit 10.45.0.0 0.0.255.255
+!
+ip nat inside source list NAT-INSIDE interface GigabitEthernet0/0 overload
+ip route 0.0.0.0 0.0.0.0 10.45.1.2
+!
+! ---------- CR3: guest isolation ----------
+ip access-list extended GUEST-IN
+ remark Allow DHCP from guest clients
+ permit udp any eq bootpc any eq bootps
+ remark Guests may NOT reach internal VLANs or the WAN link
+ deny ip 10.45.40.0 0.0.0.255 10.45.10.0 0.0.0.255
+ deny ip 10.45.40.0 0.0.0.255 10.45.20.0 0.0.0.255
+ deny ip 10.45.40.0 0.0.0.255 10.45.30.0 0.0.0.255
+ deny ip 10.45.40.0 0.0.0.255 10.45.1.0 0.0.0.3
+ remark Everything else (Internet) is permitted
+ permit ip 10.45.40.0 0.0.0.255 any
+!
+! ---------- Assigned challenge: SSH management plane ----------
+ip domain-name bophelong-gym.local
+username itadmin privilege 15 secret Gym#Admin2026
+crypto key generate rsa general-keys modulus 2048
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3
+!
+ip access-list standard SSH-MGMT-ONLY
+ remark SSH sessions allowed only from VLAN 10 (10.45.10.0/24)
+ permit 10.45.10.0 0.0.0.255
+ deny any
+!
+line console 0
+ login local
+ exec-timeout 5 0
+ logging synchronous
+!
+line vty 0 4
+ access-class SSH-MGMT-ONLY in
+ login local
+ transport input ssh
+ exec-timeout 5 0
+!
+end
+write memory

@@ -1,0 +1,113 @@
+!===============================================================
+! Switch0 - Cisco 2960-24TT - Bophelong Gym & Fitness Centre
+! Project CMPG325-2026-117 | Client CLI-117 | Milestone 2
+!===============================================================
+enable
+configure terminal
+!
+hostname Switch0
+no ip domain-lookup
+service password-encryption
+enable secret Enable#Gym2026
+!
+banner motd #
+AUTHORISED ACCESS ONLY - Bophelong Gym and Fitness Centre.
+Activity on this device is monitored.
+#
+!
+! ---------- VLANs ----------
+vlan 10
+ name MGMT
+vlan 20
+ name STAFF
+vlan 30
+ name GYM-FLOOR
+vlan 40
+ name GUEST
+vlan 99
+ name NATIVE-UNUSED
+!
+! ---------- Access ports ----------
+interface FastEthernet0/1
+ description IT-Support-Laptop (VLAN 10)
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+!
+interface range FastEthernet0/2 - 3
+ description Reception/Admin PCs (VLAN 20)
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+!
+interface FastEthernet0/4
+ description Server0 Membership/POS (VLAN 20)
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+!
+interface range FastEthernet0/5 - 6
+ description Trainer laptops (VLAN 30)
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+!
+interface FastEthernet0/7
+ description AP0 Guest Wi-Fi (VLAN 40)
+ switchport mode access
+ switchport access vlan 40
+ spanning-tree portfast
+!
+! ---------- Unused ports ----------
+interface range FastEthernet0/8 - 24
+ description Unused
+ shutdown
+!
+interface GigabitEthernet0/2
+ description Unused
+ shutdown
+!
+! ---------- Trunk to Router0 ----------
+interface GigabitEthernet0/1
+ description 802.1Q trunk to Router0 Gi0/1
+ switchport mode trunk
+ switchport trunk native vlan 99
+ switchport trunk allowed vlan 10,20,30,40,99
+!
+! ---------- Management interface ----------
+interface Vlan1
+ shutdown
+!
+interface Vlan10
+ description Management SVI
+ ip address 10.45.10.2 255.255.255.0
+ no shutdown
+!
+ip default-gateway 10.45.10.1
+!
+! ---------- Assigned challenge: SSH management plane ----------
+ip domain-name bophelong-gym.local
+username itadmin privilege 15 secret Gym#Admin2026
+crypto key generate rsa general-keys modulus 2048
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3
+!
+ip access-list standard SSH-MGMT-ONLY
+ remark SSH sessions allowed only from VLAN 10 (10.45.10.0/24)
+ permit 10.45.10.0 0.0.0.255
+ deny any
+!
+line console 0
+ login local
+ exec-timeout 5 0
+ logging synchronous
+!
+line vty 0 15
+ access-class SSH-MGMT-ONLY in
+ login local
+ transport input ssh
+ exec-timeout 5 0
+!
+end
+write memory
